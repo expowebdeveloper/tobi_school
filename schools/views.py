@@ -56,123 +56,90 @@ def generate_prompt_with_url(school_website_url):
     if school_website_url and not school_website_url.startswith(('http://', 'https://')):
         school_website_url = 'https://' + school_website_url
 
-    prompt = f"""You are an automated academic calendar and term-date extraction engine.
+    prompt = f"""
 
-Input:
-- School website URL: {school_website_url}
+You are an automated academic calendar and term-date extraction engine.
 
-GOAL:
-Extract 100% of ALL academic calendar, term dates, holidays, closures, and staff-only days published anywhere on the website or its linked documents.
-ABSOLUTELY NO PARTIAL, GUESSED, OR TRUNCATED DATA IS ALLOWED.
+INPUT - School website URL: {school_website_url}
 
-CRITICAL INSTRUCTIONS (MUST FOLLOW):
+GOAL
+Extract academic calendar data from the school website.
+If the school does NOT publish term dates, fall back to the official local authority
+school holiday calendar for the school’s location (England).
 
-1. WEBSITE CRAWLING (MANDATORY)
-   - Crawl the ENTIRE website recursively.
-   - Visit EVERY internal page, including but not limited to:
-     - Term Dates
-     - School Calendar
-     - Academic Calendar
-     - Parents Information
-     - Key Dates
-     - Policies
-     - News / Announcements
-     - Downloads / Documents
-   - Do NOT rely on navigation menus only.
-   - Follow ALL internal links until no new date-related pages exist.
+IMPORTANT BEHAVIOUR CHANGE (DO NOT FAIL)
+- If school-specific term dates are NOT found, DO NOT fail.
+- Instead, identify the school’s local authority and use its official
+  school term and holiday dates.
+- Always return JSON output.
 
-2. DOCUMENT HANDLING (MANDATORY)
-   - Detect and open ALL downloadable files:
-     - PDF, DOC, DOCX, XLS, XLSX
-   - Fully read:
-     - Tables
-     - Headers
-     - Footnotes
-     - Notes
-     - Small print
-   - Extract ALL date-related text from documents.
-   - If a document is linked from another document, open that too.
+WEBSITE CHECK (FIRST PRIORITY)
+- Check the entire school website for:
+  Term Dates
+  Calendar
+  Parents Information
+  Downloads
+  Prospectus
+  Newsletters
+- Extract any dates found.
 
-3. EVENT EXTRACTION RULES (ZERO TOLERANCE)
-   - EVERY event must be extracted as its OWN entry.
-   - DO NOT merge events.
-   - DO NOT summarise.
-   - DO NOT rewrite text.
-   - Preserve the FULL original wording EXACTLY as written.
+FALLBACK RULE (MANDATORY)
+- If no term dates are published by the school:
+  - Detect the school’s local authority
+  - Use the official local authority term & holiday dates
+  - Clearly reflect them as holidays/terms in the output
 
-4. DATE RULES (STRICT)
-   - Convert ALL dates to ISO format: YYYY-MM-DD
-   - If a date range is given:
-       - start_date = first date
-       - end_date = last date
-   - If a single-day event:
-       - end_date = null
-   - If ANY part of a date is unclear or missing:
-       - STOP and SEARCH again until the exact date is found
-       - NEVER output placeholders like "?", "…", or incomplete dates
-   - Ignore weekday names once the date is identified
-   - NEVER infer dates from weekdays alone
+EVENT RULES
+- Each event must be its own entry
+- Do NOT merge events
+- Do NOT guess individual school INSET days
+- Use only official published dates
 
-5. TIME RULES
-   - If a time is written (e.g., "closes at 2pm"):
-       - Convert to 24-hour format (HH:MM)
-   - If no time is written:
-       - time = null
+DATE RULES
+- Convert all dates to ISO format: YYYY-MM-DD
+- Date range → start_date & end_date
+- Single day → end_date = null
+- No weekday inference
 
-6. COVERAGE REQUIREMENTS (MANDATORY)
- Extract data for:
-   - ALL academic years listed (past, current, future)
-   - ALL terms:
-     - Autumn
-     - Spring
-     - Summer
-   - ALL Half Terms
-   - ALL Holidays
-   - ALL INSET days
-   - ALL Bank Holidays
-   - ALL School closures
-   - ALL Staff training days
-   - ALL early closures
+TIME RULES
+- If no time is written → time = null
 
-7. VALIDATION BEFORE OUTPUT (REQUIRED)
-   - Verify there are NO:
-     - Missing end dates
-     - Unknown dates
-     - Truncated events
-     - Partial years
-   - If ANY event is incomplete:
-     - Re-crawl the site and documents
-     - Do NOT output until complete
+OUTPUT RULES
+- JSON ONLY
+- NO explanations
+- NO markdown
+- NO comments
+- NO failure responses
 
-OUTPUT FORMAT (JSON ONLY — NO EXPLANATION):
+OUTPUT FORMAT
 
 {{
-  "school_name": "Education My Life Matters (EMLM)",
-  "source_url": "{school_website_url}",
+  "school_name": "",
+  "source_url": "",
   "terms": [
     {{
       "academic_year": "YYYY-YYYY",
-      "term_name": "Autumn | Spring | Summer | Holiday | Half Term | INSET | Closure",
+      "term_name": "Autumn | Spring | Summer | Holiday",
       "events": [
         {{
           "start_date": "YYYY-MM-DD",
           "end_date": "YYYY-MM-DD or null",
-          "time": "HH:MM or null",
-          "event_text": "FULL original event description exactly as written"
+          "time": null,
+          "event_text": "Original official event description"
         }}
       ]
     }}
   ]
 }}
 
-ABSOLUTE RULES:
-- JSON ONLY
-- NO markdown
-- NO explanations
-- NO assumptions
-- NO placeholders
-- NO missing data
-- FAIL THE TASK IF DATA IS INCOMPLETE"""
+FINAL INSTRUCTION
+- ALWAYS return valid JSON
+- NEVER stop execution
+- NEVER say data is missing
+
+
+
+"""
 
     return prompt
 
@@ -320,6 +287,96 @@ def create_or_update_school_data(request):
             'action': 'created',
             'data': school_data.data
         }, status=201)
+
+
+@require_http_methods(["GET"])
+def get_schools_with_invalid_data(request):
+    """
+    GET API endpoint that returns a random school link for a school that has process=True,
+    second_scraper=False, and either no data in SchoolData or invalid calendar data.
+
+    When a school is selected, its second_scraper status is automatically set to True.
+
+    Invalid data means:
+    - No SchoolData entries exist, OR
+    - SchoolData exists but doesn't have valid calendar format (missing 'school_name' or 'terms' keys)
+
+    URL: /api/schools/invalid-data/
+
+    Returns:
+    {
+        "school_id": 100000,
+        "school_name": "Example School",
+        "website": "https://example.com",
+        "reason": "no_data" or "invalid_data"
+    }
+
+    Or if no school found:
+    {
+        "error": "No school found with invalid data"
+    }
+    """
+    # Get all schools with process=True and second_scraper=False
+    schools = School.objects.filter(
+        process=True,
+        second_scraper=False
+    ).prefetch_related('school_data')
+
+    # Collect all schools with invalid or missing data
+    valid_schools = []
+
+    for school in schools:
+        # Get the most recent SchoolData
+        school_data = SchoolData.objects.filter(
+            school=school).order_by('-created_at').first()
+
+        # Check if school has no data or invalid data
+        has_invalid_data = False
+        reason = None
+
+        if not school_data:
+            # No SchoolData exists
+            has_invalid_data = True
+            reason = "no_data"
+        else:
+            # Check if data is valid calendar format
+            data = school_data.data
+            if not isinstance(data, dict):
+                # Data is not a dictionary
+                has_invalid_data = True
+                reason = "invalid_data"
+            elif 'school_name' not in data or 'terms' not in data:
+                # Data doesn't have required calendar format keys
+                has_invalid_data = True
+                reason = "invalid_data"
+
+        # Collect schools with invalid or missing data that have a website
+        if has_invalid_data and school.website:
+            valid_schools.append({
+                'school': school,
+                'reason': reason
+            })
+
+    # Return random school if available
+    if valid_schools:
+        selected = random.choice(valid_schools)
+        school = selected['school']
+
+        # Update second_scraper status to True when school is selected
+        school.second_scraper = True
+        school.save()
+
+        return JsonResponse({
+            'school_id': school.urn,
+            'school_name': school.establishment_name,
+            'website': school.website.strip(),
+            'reason': selected['reason']
+        })
+
+    # No school found
+    return JsonResponse({
+        'error': 'No school found with invalid data'
+    }, status=404)
 
 
 @require_http_methods(["GET"])

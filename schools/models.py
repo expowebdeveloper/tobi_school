@@ -32,6 +32,10 @@ class School(models.Model):
         null=True,
         help_text="School website URL"
     )
+    second_scraper = models.BooleanField(
+        default=False,
+        help_text="Second scraper status for the school"
+    )
 
     class Meta:
         ordering = ['establishment_name']

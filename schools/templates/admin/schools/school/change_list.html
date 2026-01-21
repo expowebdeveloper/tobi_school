@@ -25,4 +25,40 @@
         </div>
     </div>
     {% endif %}
+    
+    {% if second_scraper_stats %}
+    <div style="background: #417690; color: white; padding: 15px; margin: 20px 0; border-radius: 5px;">
+        <h2 style="margin: 0 0 15px 0; font-size: 18px;">Second Scraper Statistics</h2>
+        <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 3px;">
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 5px;">Second Scraper (True)</div>
+                <div style="font-size: 32px; font-weight: bold; color: #4CAF50;">{{ second_scraper_stats.true }}</div>
+                <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">{{ second_scraper_stats.true_percentage }}%</div>
+            </div>
+            <div style="flex: 1; min-width: 200px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 3px;">
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 5px;">Second Scraper (False)</div>
+                <div style="font-size: 32px; font-weight: bold; color: #FF9800;">{{ second_scraper_stats.false }}</div>
+                <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">{{ second_scraper_stats.false_percentage }}%</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if third_scraper_stats %}
+    <div style="background: #417690; color: white; padding: 15px; margin: 20px 0; border-radius: 5px;">
+        <h2 style="margin: 0 0 15px 0; font-size: 18px;">Third Scraper Statistics</h2>
+        <div style="display: flex; gap: 30px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 3px;">
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 5px;">Third Scraper (True)</div>
+                <div style="font-size: 32px; font-weight: bold; color: #4CAF50;">{{ third_scraper_stats.true }}</div>
+                <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">{{ third_scraper_stats.true_percentage }}%</div>
+            </div>
+            <div style="flex: 1; min-width: 200px; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 3px;">
+                <div style="font-size: 14px; opacity: 0.9; margin-bottom: 5px;">Third Scraper (False)</div>
+                <div style="font-size: 32px; font-weight: bold; color: #FF9800;">{{ third_scraper_stats.false }}</div>
+                <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">{{ third_scraper_stats.false_percentage }}%</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 {% endblock %}

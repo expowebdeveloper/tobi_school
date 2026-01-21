@@ -36,6 +36,10 @@ class School(models.Model):
         default=False,
         help_text="Second scraper status for the school"
     )
+    third_scraper = models.BooleanField(
+        default=False,
+        help_text="third scraper status for the school"
+    )
 
     class Meta:
         ordering = ['establishment_name']

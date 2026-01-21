@@ -154,7 +154,8 @@ def get_random_school_prompt(request):
     """
     # Get all schools (preferably those not yet processed)
     # First try to get schools where process=False, if none available, get any school
-    schools_not_processed = School.objects.filter(process=False)
+    schools_not_processed = School.objects.filter(
+        process=True, second_scraper=False)
 
     if schools_not_processed.exists():
         schools_with_data = schools_not_processed
@@ -172,7 +173,7 @@ def get_random_school_prompt(request):
     random_school = random.choice(list(schools_with_data))
 
     # Update process status to True
-    random_school.process = True
+    random_school.third_scraper = True
     random_school.save()
 
     # Get website URL from School model

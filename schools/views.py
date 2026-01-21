@@ -1,3 +1,4 @@
+from django.db.models import Prefetch
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -317,19 +318,31 @@ def get_schools_with_invalid_data(request):
         "error": "No school found with invalid data"
     }
     """
-    # Get all schools with process=True and second_scraper=False
+
+    # Optimize: Get all schools with process=True, second_scraper=False, and website exists
+    # Filter at database level to reduce data transfer and use prefetch for related data
     schools = School.objects.filter(
         process=True,
-        second_scraper=False
-    ).prefetch_related('school_data')
+        second_scraper=False,
+        website__isnull=False
+    ).exclude(website='').prefetch_related(
+        Prefetch(
+            'school_data',
+            queryset=SchoolData.objects.order_by('-created_at'),
+            to_attr='all_school_data'
+        )
+    )
 
     # Collect all schools with invalid or missing data
     valid_schools = []
 
-    for school in schools:
-        # Get the most recent SchoolData
-        school_data = SchoolData.objects.filter(
-            school=school).order_by('-created_at').first()
+    # Evaluate queryset once - this is the only database hit for schools
+    schools_list = list(schools)
+
+    for school in schools_list:
+        # Use prefetched data - get the first (latest) one
+        school_data_list = getattr(school, 'all_school_data', [])
+        school_data = school_data_list[0] if school_data_list else None
 
         # Check if school has no data or invalid data
         has_invalid_data = False
@@ -351,8 +364,8 @@ def get_schools_with_invalid_data(request):
                 has_invalid_data = True
                 reason = "invalid_data"
 
-        # Collect schools with invalid or missing data that have a website
-        if has_invalid_data and school.website:
+        # Collect schools with invalid or missing data
+        if has_invalid_data:
             valid_schools.append({
                 'school': school,
                 'reason': reason
@@ -365,7 +378,7 @@ def get_schools_with_invalid_data(request):
 
         # Update second_scraper status to True when school is selected
         school.second_scraper = True
-        school.save()
+        school.save(update_fields=['second_scraper'])
 
         return JsonResponse({
             'school_id': school.urn,

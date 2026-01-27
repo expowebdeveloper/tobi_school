@@ -1,4 +1,4 @@
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Count
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -153,16 +153,18 @@ def get_random_school_prompt(request):
 
     URL: /api/schools/random/prompt/
     """
-    # Get all schools (preferably those not yet processed)
-    # First try to get schools where process=False, if none available, get any school
+    # Prefer schools that are process=True, second_scraper=False and have no SchoolData yet
     schools_not_processed = School.objects.filter(
-        process=True, second_scraper=False)
+        process=True, second_scraper=False
+    ).annotate(num_data=Count('school_data')).filter(num_data=0)
 
     if schools_not_processed.exists():
         schools_with_data = schools_not_processed
     else:
-        # If all schools are processed, get any school
-        schools_with_data = School.objects.all()
+        # Fallback: only schools that have at least one SchoolData entry
+        schools_with_data = School.objects.annotate(
+            num_data=Count('school_data')
+        ).filter(num_data__gt=0)
 
     if not schools_with_data.exists():
         return JsonResponse(
